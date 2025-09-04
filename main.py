@@ -1,0 +1,204 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import tkinter as tk
+from tkinter import ttk
+
+# -------------------------------
+# Functions for system simulation
+# -------------------------------
+def f(t, x, u, A, B):
+    return A @ x + B @ np.atleast_1d(u)
+
+def output(x, u, C, D):
+    return C @ x + D @ np.atleast_1d(u)
+
+def euler_step(x, u, t, h, A, B):
+    return x + h * f(t, x, u, A, B)
+
+def rk4_step(x, u, t, h, A, B):
+    k1 = f(t, x, u, A, B)
+    k2 = f(t + h/2, x + h/2 * k1, u, A, B)
+    k3 = f(t + h/2, x + h/2 * k2, u, A, B)
+    k4 = f(t + h,   x + h * k3,   u, A, B)
+    return x + (h/6) * (k1 + 2*k2 + 2*k3 + k4)
+
+# Input signals
+def u_square(t, amplitude, period, phase, duty):
+    cycle_pos = ((t + phase) / period) % 1
+    return amplitude if cycle_pos < duty else -amplitude
+
+def u_sawtooth(t, amplitude, period, phase):
+    return amplitude * (2 * ((t + phase) / period % 1) - 1)
+
+def u_harmonic(t, amplitude, frequency, phase):
+    return amplitude * np.sin(2 * np.pi * frequency * t + phase)
+
+# -------------------------------
+# GUI Application
+# -------------------------------
+class SimulatorApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Symulator układu z modelem stanowym")
+
+        # --- Controls frame ---
+        control_frame = ttk.Frame(root)
+        control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+
+        # System parameters
+        ttk.Label(control_frame, text="Parametry układu").pack()
+        self.J1 = tk.DoubleVar(value=5.0)
+        self.J2 = tk.DoubleVar(value=10.4)
+        self.b1 = tk.DoubleVar(value=2.8)
+        self.b2 = tk.DoubleVar(value=7.4)
+        self.n1 = tk.DoubleVar(value=20.0)
+        self.n2 = tk.DoubleVar(value=10.0)
+
+        for text, var in [("J1", self.J1), ("J2", self.J2),
+                          ("b1", self.b1), ("b2", self.b2),
+                          ("n1", self.n1), ("n2", self.n2)]:
+            frame = ttk.Frame(control_frame)
+            frame.pack(anchor="w")
+            ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
+            ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+
+        ttk.Label(control_frame, text="").pack()  # separator
+
+        # Input parameters
+        ttk.Label(control_frame, text="Parametry sygnału wejściowego").pack()
+        self.signal_type = tk.StringVar(value="sinus")
+        ttk.Radiobutton(control_frame, text="Harmoniczny", variable=self.signal_type, value="sinus").pack(anchor="w")
+        ttk.Radiobutton(control_frame, text="Prostokątny", variable=self.signal_type, value="square").pack(anchor="w")
+        ttk.Radiobutton(control_frame, text="Trójkątny", variable=self.signal_type, value="sawtooth").pack(anchor="w")
+
+        self.amplitude = tk.DoubleVar(value=1.0)
+        self.period = tk.DoubleVar(value=1.0)
+        self.frequency = tk.DoubleVar(value=0.4)
+        self.phase = tk.DoubleVar(value=0.0)
+        self.duty = tk.DoubleVar(value=0.5)
+
+        for text, var in [("Amplituda", self.amplitude),
+                          ("Okres", self.period),
+                          ("Częstotliwość", self.frequency),
+                          ("Faza", self.phase),
+                          ("Wypełnenie", self.duty)]:
+            frame = ttk.Frame(control_frame)
+            frame.pack(anchor="w")
+            ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
+            ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+
+        ttk.Label(control_frame, text="").pack()  # separator
+
+        # Simulation parameters
+        ttk.Label(control_frame, text="Parametry symulacji").pack()
+        self.t0 = tk.DoubleVar(value=0.0)
+        self.tf = tk.DoubleVar(value=10.0)
+        self.h = tk.DoubleVar(value=0.01)
+
+        # Initial conditions
+        self.x10 = tk.DoubleVar(value=0.0)  # x1(0)
+        self.x20 = tk.DoubleVar(value=0.0)  # x2(0)
+
+        for text, var in [("Początek symulacji", self.t0),
+                        ("Koniec symulacji", self.tf),
+                        ("Skok", self.h),
+                        ("x1(0)", self.x10),
+                        ("x2(0)", self.x20)]:
+            frame = ttk.Frame(control_frame)
+            frame.pack(anchor="w")
+            ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
+            ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+
+        ttk.Button(control_frame, text="Symuluj", command=self.run_simulation).pack(pady=10)
+
+        # --- Plot frame ---
+        plot_frame = ttk.Frame(root)
+        plot_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        self.figure, self.axs = plt.subplots(3, 1, figsize=(8, 8))
+        self.canvas = FigureCanvasTkAgg(self.figure, master=plot_frame)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    def run_simulation(self):
+        # Get parameters
+        J1, J2, b1, b2, n1, n2 = self.J1.get(), self.J2.get(), self.b1.get(), self.b2.get(), self.n1.get(), self.n2.get()
+        Jeq = J1 + J2 * (n1/n2)**2
+        beq = b1 + b2 * (n1/n2)**2
+
+        A = np.array([[0, 1], [0, -beq/Jeq]])
+        B = np.array([[0], [1/Jeq]])
+        C = np.array([[(n1/n2), 0], [0, (n1/n2)]])
+        D = np.array([[0], [0]])
+
+        t0, tf, h = self.t0.get(), self.tf.get(), self.h.get()
+        t_vals = np.arange(t0, tf, h)
+
+        x0 = np.array([self.x10.get(), self.x20.get()])
+        x_euler = [x0]
+        x_rk4 = [x0]
+
+        # choose input function
+        if self.signal_type.get() == "square":
+            u_func = lambda t: u_square(t, self.amplitude.get(), self.period.get(), self.phase.get(), self.duty.get())
+        elif self.signal_type.get() == "sawtooth":
+            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.period.get(), self.phase.get())
+        else:
+            u_func = lambda t: u_harmonic(t, self.amplitude.get(), self.frequency.get(), self.phase.get())
+
+        u_vals = []
+        y_euler = [output(x0, u_func(t0), C, D)]
+        y_rk4 = [output(x0, u_func(t0), C, D)]
+
+        for t in t_vals[:-1]:
+            u = u_func(t)
+            u_vals.append(u)
+            x_euler.append(euler_step(x_euler[-1], u, t, h, A, B))
+            x_rk4.append(rk4_step(x_rk4[-1], u, t, h, A, B))
+            y_euler.append(output(x_euler[-1], u, C, D))
+            y_rk4.append(output(x_rk4[-1], u, C, D))
+
+        x_euler = np.array(x_euler)
+        x_rk4 = np.array(x_rk4)
+        y_euler = np.array(y_euler)
+        y_rk4 = np.array(y_rk4)
+
+        # --- update plots ---
+        for ax in self.axs:
+            ax.clear()
+
+        self.axs[0].plot(t_vals, [u_func(t) for t in t_vals], label="u(t)")
+        self.axs[0].set_title("Sygnał wejściowy u(t)")
+        self.axs[0].legend()
+        self.axs[0].grid()
+
+        self.axs[1].plot(t_vals, y_euler[:,0], label="Euler - theta2")
+        self.axs[1].plot(t_vals, y_rk4[:,0], "--", label="RK4 - theta2")
+        self.axs[1].set_title("Wyjście theta2")
+        self.axs[1].legend()
+        self.axs[1].grid()
+
+        self.axs[2].plot(t_vals, y_euler[:,1], label="Euler - omega2")
+        self.axs[2].plot(t_vals, y_rk4[:,1], "--", label="RK4 - omega2")
+        self.axs[2].set_title("Wyjście omega2")
+        self.axs[2].legend()
+        self.axs[2].grid()
+
+        self.figure.tight_layout()
+        self.canvas.draw()
+
+# -------------------------------
+# Run the app
+# -------------------------------
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = SimulatorApp(root)
+
+    # obsługa zamykania
+    def on_closing():
+        plt.close('all')   # zamknij wszystkie wykresy Matplotlib
+        root.quit()        # zakończ pętlę mainloop
+        root.destroy()     # zniszcz okno
+
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    root.mainloop()
