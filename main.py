@@ -33,8 +33,17 @@ def u_square(t, amplitude, frequency, phase, duty, offset):
     val = amplitude if cycle_pos < duty else -amplitude
     return val + offset
 
-def u_sawtooth(t, amplitude, frequency, phase, offset):
-    val = amplitude * (2 * ((t + phase) / (1/frequency) % 1) - 1)
+def u_sawtooth(t, amplitude, frequency, phase, offset=0, symmetric=False):
+    cycle = ((t + phase) / (1/frequency)) % 1
+    if symmetric:
+        # trójkąt: narastanie i opadanie z takim samym nachyleniem
+        if cycle < 0.5:
+            val = 2 * amplitude * (2 * cycle - 0.5)   # od -A do +A w 0.5 okresu
+        else:
+            val = 2 * amplitude * (1.5 - 2 * cycle)   # od +A do -A w 0.5 okresu
+    else:
+        # klasyczna piła (narastająca)
+        val = amplitude * (2 * cycle - 1)  # od -A do +A
     return val + offset
 
 def u_harmonic(t, amplitude, frequency, phase, offset):
@@ -42,7 +51,7 @@ def u_harmonic(t, amplitude, frequency, phase, offset):
     return val + offset
 
 # -------------------------------
-# GUI
+# Aplikacja
 # -------------------------------
 class SimulatorApp:
     def __init__(self, root):
@@ -66,6 +75,7 @@ class SimulatorApp:
         self.phase = tk.DoubleVar(value=0.0)
         self.offset = tk.DoubleVar(value=0.0)
         self.duty = tk.DoubleVar(value=0.5)
+        self.sawtooth_symmetric = tk.BooleanVar(value=False)
         
         self.t0 = tk.DoubleVar(value=0.0)
         self.tf = tk.DoubleVar(value=10.0)
@@ -96,7 +106,7 @@ class SimulatorApp:
         ttk.Radiobutton(control_frame, text="Harmoniczny", variable=self.signal_type, value="sinus").pack(anchor="w")
         ttk.Radiobutton(control_frame, text="Prostokątny", variable=self.signal_type, value="square").pack(anchor="w")
         ttk.Radiobutton(control_frame, text="Trójkątny", variable=self.signal_type, value="sawtooth").pack(anchor="w")
-
+        ttk.Checkbutton(control_frame, text="Symetryczny", variable=self.sawtooth_symmetric).pack(anchor="w")
         ttk.Label(control_frame, text="").pack()  # separator
 
         for text, var, unit in [("Amplituda", self.amplitude, "N·m"),
@@ -162,6 +172,9 @@ class SimulatorApp:
         self.toolbar.update()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
+    # -------------------------------
+    # Symulacja
+    # -------------------------------
     def run_simulation(self):
         # Wczytanie parametrów
         J1, J2, b1, b2, n1, n2 = self.J1.get(), self.J2.get(), self.b1.get(), self.b2.get(), self.n1.get(), self.n2.get()
@@ -186,7 +199,7 @@ class SimulatorApp:
         if self.signal_type.get() == "square":
             u_func = lambda t: u_square(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.duty.get(), self.offset.get())
         elif self.signal_type.get() == "sawtooth":
-            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.offset.get())
+            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.offset.get(), self.sawtooth_symmetric.get())
         else:
             u_func = lambda t: u_harmonic(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.offset.get())
 
@@ -226,7 +239,7 @@ class SimulatorApp:
         self.axs[1].set_ylabel("Kąt [°]")
         self.axs[1].legend()
         self.axs[1].grid()
-        
+
         # Wykres wyjścia omega
         self.axs[2].plot(t_vals, y_euler[:,1], label="Euler - \u03C9\u2082 [rad/s]")
         self.axs[2].plot(t_vals, y_rk4[:,1], "--", label="RK4 - \u03C9\u2082 [rad/s]")
@@ -239,7 +252,7 @@ class SimulatorApp:
         self.canvas.draw()
 
 # -------------------------------
-# Działanie aplikacji
+# Pętla aplikacji
 # -------------------------------
 if __name__ == "__main__":
     root = tk.Tk()
