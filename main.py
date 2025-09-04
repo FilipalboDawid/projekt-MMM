@@ -89,8 +89,8 @@ class SimulatorApp:
 
         for text, var, unit in [("Amplituda", self.amplitude, "N·m"),
                         ("Częstotliwość", self.frequency, "Hz"),
-                        ("Faza", self.phase, "rad"),
-                        ("Wypełnienie", self.duty, "-")]:
+                        ("Przesunięcie fazowe", self.phase, "°"),
+                        ("Wypełnienie (tylko prostokąt)", self.duty, "-")]:
             frame = ttk.Frame(control_frame)
             frame.pack(anchor="w")
             ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
@@ -169,11 +169,11 @@ class SimulatorApp:
 
         # Wybór sygnału wejściowego
         if self.signal_type.get() == "square":
-            u_func = lambda t: u_square(t, self.amplitude.get(), self.frequency.get(), self.phase.get(), self.duty.get())
+            u_func = lambda t: u_square(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.duty.get())
         elif self.signal_type.get() == "sawtooth":
-            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.frequency.get(), self.phase.get())
+            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()))
         else:
-            u_func = lambda t: u_harmonic(t, self.amplitude.get(), self.frequency.get(), self.phase.get())
+            u_func = lambda t: u_harmonic(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()))
 
         #Inicjalizacja wyjścia
         u_vals = []
