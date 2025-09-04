@@ -4,6 +4,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 import tkinter as tk
 from tkinter import ttk
+from PIL import Image, ImageTk
 
 # -------------------------------
 # Functions for system simulation
@@ -128,6 +129,19 @@ class SimulatorApp:
         self.canvas = FigureCanvasTkAgg(self.figure, master=plot_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
+        # --- Image frame ---
+        image_frame = ttk.Frame(control_frame)
+        image_frame.pack(pady=10)
+
+        # Wczytaj obraz układu
+        self.image = Image.open("uklad.png")  # ścieżka do Twojego pliku
+        self.image = self.image.resize((300, 200), Image.LANCZOS)  # opcjonalne skalowanie
+        self.photo = ImageTk.PhotoImage(self.image)
+
+        # Wyświetl obraz
+        self.image_label = ttk.Label(image_frame, image=self.photo)
+        self.image_label.pack()
+
         # Dodanie toolbar
         self.toolbar = NavigationToolbar2Tk(self.canvas, plot_frame)
         self.toolbar.update()
@@ -181,7 +195,7 @@ class SimulatorApp:
             ax.clear()
 
         self.axs[0].plot(t_vals, [u_func(t) for t in t_vals], label="u(t)")
-        self.axs[0].set_title("Sygnał wejściowy T\u2098(t) [N·m]")
+        self.axs[0].set_title("Sygnał wejściowy u(t) = T\u2098 [N·m]")
         self.axs[0].set_ylabel("T\u2098(t) [N·m]")  # Wykres sygnału wejściowego
         self.axs[0].legend()
         self.axs[0].grid()
