@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 import tkinter as tk
 from tkinter import ttk
 
@@ -48,20 +49,25 @@ class SimulatorApp:
 
         # System parameters
         ttk.Label(control_frame, text="Parametry układu").pack()
-        self.J1 = tk.DoubleVar(value=5.0)
-        self.J2 = tk.DoubleVar(value=10.4)
-        self.b1 = tk.DoubleVar(value=2.8)
-        self.b2 = tk.DoubleVar(value=7.4)
-        self.n1 = tk.DoubleVar(value=20.0)
-        self.n2 = tk.DoubleVar(value=10.0)
+        self.J1 = tk.DoubleVar(value=10.0)
+        self.J2 = tk.DoubleVar(value=10.0)
+        self.b1 = tk.DoubleVar(value=10.0)
+        self.b2 = tk.DoubleVar(value=10.0)
+        self.n1 = tk.DoubleVar(value=10.0)
+        self.n2 = tk.DoubleVar(value=20.0)
 
-        for text, var in [("J1", self.J1), ("J2", self.J2),
-                          ("b1", self.b1), ("b2", self.b2),
-                          ("n1", self.n1), ("n2", self.n2)]:
+        for text, var, unit in [("J\u2081", self.J1, "kg·m²"),
+                        ("J\u2082", self.J2, "kg·m²"),
+                        ("b\u2081", self.b1, "N·m·s/rad"),
+                        ("b\u2082", self.b2, "N·m·s/rad"),
+                        ("n\u2081", self.n1, "-"),
+                        ("n\u2082", self.n2, "-")]:
             frame = ttk.Frame(control_frame)
             frame.pack(anchor="w")
             ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
             ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+            ttk.Label(frame, text=unit).pack(side=tk.LEFT)
+
 
         ttk.Label(control_frame, text="").pack()  # separator
 
@@ -74,19 +80,20 @@ class SimulatorApp:
 
         self.amplitude = tk.DoubleVar(value=1.0)
         self.period = tk.DoubleVar(value=1.0)
-        self.frequency = tk.DoubleVar(value=0.4)
+        self.frequency = tk.DoubleVar(value=0.5)
         self.phase = tk.DoubleVar(value=0.0)
         self.duty = tk.DoubleVar(value=0.5)
 
-        for text, var in [("Amplituda", self.amplitude),
-                          ("Okres", self.period),
-                          ("Częstotliwość", self.frequency),
-                          ("Faza", self.phase),
-                          ("Wypełnenie", self.duty)]:
+        for text, var, unit in [("Amplituda", self.amplitude, "N·m"),
+                        ("Okres", self.period, "s"),
+                        ("Częstotliwość", self.frequency, "Hz"),
+                        ("Faza", self.phase, "rad"),
+                        ("Wypełnienie", self.duty, "-")]:
             frame = ttk.Frame(control_frame)
             frame.pack(anchor="w")
             ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
             ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+            ttk.Label(frame, text=unit).pack(side=tk.LEFT)
 
         ttk.Label(control_frame, text="").pack()  # separator
 
@@ -100,15 +107,16 @@ class SimulatorApp:
         self.x10 = tk.DoubleVar(value=0.0)  # x1(0)
         self.x20 = tk.DoubleVar(value=0.0)  # x2(0)
 
-        for text, var in [("Początek symulacji", self.t0),
-                        ("Koniec symulacji", self.tf),
-                        ("Skok", self.h),
-                        ("x1(0)", self.x10),
-                        ("x2(0)", self.x20)]:
+        for text, var, unit in [("Początek symulacji", self.t0, "s"),
+                        ("Koniec symulacji", self.tf, "s"),
+                        ("Skok", self.h, "s"),
+                        ("\u03B8\u2081(0)", self.x10, "°"),
+                        ("\u03C9\u2081(0)", self.x20, "rad/s")]:
             frame = ttk.Frame(control_frame)
             frame.pack(anchor="w")
             ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
             ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+            ttk.Label(frame, text=unit).pack(side=tk.LEFT)
 
         ttk.Button(control_frame, text="Symuluj", command=self.run_simulation).pack(pady=10)
 
@@ -118,6 +126,11 @@ class SimulatorApp:
 
         self.figure, self.axs = plt.subplots(3, 1, figsize=(8, 8))
         self.canvas = FigureCanvasTkAgg(self.figure, master=plot_frame)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # Dodanie toolbar
+        self.toolbar = NavigationToolbar2Tk(self.canvas, plot_frame)
+        self.toolbar.update()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def run_simulation(self):
@@ -134,7 +147,7 @@ class SimulatorApp:
         t0, tf, h = self.t0.get(), self.tf.get(), self.h.get()
         t_vals = np.arange(t0, tf, h)
 
-        x0 = np.array([self.x10.get(), self.x20.get()])
+        x0 = np.array([np.radians(self.x10.get()), self.x20.get()])
         x_euler = [x0]
         x_rk4 = [x0]
 
@@ -168,19 +181,22 @@ class SimulatorApp:
             ax.clear()
 
         self.axs[0].plot(t_vals, [u_func(t) for t in t_vals], label="u(t)")
-        self.axs[0].set_title("Sygnał wejściowy u(t)")
+        self.axs[0].set_title("Sygnał wejściowy T\u2098(t) [N·m]")
+        self.axs[0].set_ylabel("T\u2098(t) [N·m]")  # Wykres sygnału wejściowego
         self.axs[0].legend()
         self.axs[0].grid()
 
-        self.axs[1].plot(t_vals, y_euler[:,0], label="Euler - theta2")
-        self.axs[1].plot(t_vals, y_rk4[:,0], "--", label="RK4 - theta2")
-        self.axs[1].set_title("Wyjście theta2")
+        self.axs[1].plot(t_vals, np.degrees(y_euler[:,0]), label="Euler - \u03B8\u2082 [deg]")
+        self.axs[1].plot(t_vals, np.degrees(y_rk4[:,0]), "--", label="RK4 - \u03B8\u2082 [deg]")
+        self.axs[1].set_title("Wyjście \u03B8\u2082 [°]")
+        self.axs[1].set_ylabel("Kąt [°]")
         self.axs[1].legend()
         self.axs[1].grid()
 
-        self.axs[2].plot(t_vals, y_euler[:,1], label="Euler - omega2")
-        self.axs[2].plot(t_vals, y_rk4[:,1], "--", label="RK4 - omega2")
-        self.axs[2].set_title("Wyjście omega2")
+        self.axs[2].plot(t_vals, y_euler[:,1], label="Euler - \u03C9\u2082 [rad/s]")
+        self.axs[2].plot(t_vals, y_rk4[:,1], "--", label="RK4 - \u03C9\u2082 [rad/s]")
+        self.axs[2].set_title("Wyjście \u03C9\u2082 [rad/s]")
+        self.axs[2].set_ylabel("Prędkość [rad/s]")
         self.axs[2].legend()
         self.axs[2].grid()
 
