@@ -28,15 +28,18 @@ def rk4_step(x, u, t, h, A, B):
 # -------------------------------
 # Funkcje sygnałów wejściowych
 # -------------------------------
-def u_square(t, amplitude, frequency, phase, duty):
+def u_square(t, amplitude, frequency, phase, duty, offset):
     cycle_pos = ((t + phase) / (1/frequency)) % 1
-    return amplitude if cycle_pos < duty else -amplitude
+    val = amplitude if cycle_pos < duty else -amplitude
+    return val + offset
 
-def u_sawtooth(t, amplitude, frequency, phase):
-    return amplitude * (2 * ((t + phase) / (1/frequency) % 1) - 1)
+def u_sawtooth(t, amplitude, frequency, phase, offset):
+    val = amplitude * (2 * ((t + phase) / (1/frequency) % 1) - 1)
+    return val + offset
 
-def u_harmonic(t, amplitude, frequency, phase):
-    return amplitude * np.sin(2 * np.pi * frequency * t + phase)
+def u_harmonic(t, amplitude, frequency, phase, offset):
+    val = amplitude * np.sin(2 * np.pi * frequency * t + phase)
+    return val + offset
 
 # -------------------------------
 # GUI
@@ -51,14 +54,28 @@ class SimulatorApp:
         control_frame.pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
 
         # Parametry układu
-        # Początkowe wartości parametrów
+        self.J1 = tk.DoubleVar(value=1.0)
+        self.J2 = tk.DoubleVar(value=1.0)
+        self.b1 = tk.DoubleVar(value=0.5)
+        self.b2 = tk.DoubleVar(value=0.5)
+        self.n1 = tk.DoubleVar(value=20.0)
+        self.n2 = tk.DoubleVar(value=30.0)
+
+        self.amplitude = tk.DoubleVar(value=1.0)
+        self.frequency = tk.DoubleVar(value=0.5)
+        self.phase = tk.DoubleVar(value=0.0)
+        self.offset = tk.DoubleVar(value=0.0)
+        self.duty = tk.DoubleVar(value=0.5)
+        
+        self.t0 = tk.DoubleVar(value=0.0)
+        self.tf = tk.DoubleVar(value=10.0)
+        self.h = tk.DoubleVar(value=0.01)
+
+        self.x10 = tk.DoubleVar(value=0.0)  # theta1(0)
+        self.x20 = tk.DoubleVar(value=0.0)  # omega1(0)
+
+        # Wyświetlanie pól do wprowadzania parametrów
         ttk.Label(control_frame, text="Parametry układu").pack()
-        self.J1 = tk.DoubleVar(value=10.0)
-        self.J2 = tk.DoubleVar(value=10.0)
-        self.b1 = tk.DoubleVar(value=10.0)
-        self.b2 = tk.DoubleVar(value=10.0)
-        self.n1 = tk.DoubleVar(value=10.0)
-        self.n2 = tk.DoubleVar(value=20.0)
 
         for text, var, unit in [("J\u2081", self.J1, "kg·m²"),
                         ("J\u2082", self.J2, "kg·m²"),
@@ -72,24 +89,20 @@ class SimulatorApp:
             ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
             ttk.Label(frame, text=unit).pack(side=tk.LEFT)
 
-
         ttk.Label(control_frame, text="").pack()  # separator
 
-        # Parametry sygnału wejściowego
         ttk.Label(control_frame, text="Parametry sygnału wejściowego").pack()
         self.signal_type = tk.StringVar(value="sinus")
         ttk.Radiobutton(control_frame, text="Harmoniczny", variable=self.signal_type, value="sinus").pack(anchor="w")
         ttk.Radiobutton(control_frame, text="Prostokątny", variable=self.signal_type, value="square").pack(anchor="w")
         ttk.Radiobutton(control_frame, text="Trójkątny", variable=self.signal_type, value="sawtooth").pack(anchor="w")
 
-        self.amplitude = tk.DoubleVar(value=1.0)
-        self.frequency = tk.DoubleVar(value=0.5)
-        self.phase = tk.DoubleVar(value=0.0)
-        self.duty = tk.DoubleVar(value=0.5)
+        ttk.Label(control_frame, text="").pack()  # separator
 
         for text, var, unit in [("Amplituda", self.amplitude, "N·m"),
                         ("Częstotliwość", self.frequency, "Hz"),
                         ("Przesunięcie fazowe", self.phase, "°"),
+                        ("Offset", self.offset, "N·m"),
                         ("Wypełnienie (tylko prostokąt)", self.duty, "-")]:
             frame = ttk.Frame(control_frame)
             frame.pack(anchor="w")
@@ -99,21 +112,23 @@ class SimulatorApp:
 
         ttk.Label(control_frame, text="").pack()  # separator
 
-        # Parametry symulacji
         ttk.Label(control_frame, text="Parametry symulacji").pack()
-        self.t0 = tk.DoubleVar(value=0.0)
-        self.tf = tk.DoubleVar(value=10.0)
-        self.h = tk.DoubleVar(value=0.01)
-
-        # Warunki początkowe
-        self.x10 = tk.DoubleVar(value=0.0)  # x1(0)
-        self.x20 = tk.DoubleVar(value=0.0)  # x2(0)
 
         for text, var, unit in [("Początek symulacji", self.t0, "s"),
                         ("Koniec symulacji", self.tf, "s"),
-                        ("Skok", self.h, "-"),
-                        ("\u03B8\u2081(0)", self.x10, "°"),
-                        ("\u03C9\u2081(0)", self.x20, "rad/s")]:
+                        ("Skok", self.h, "-")]:
+            frame = ttk.Frame(control_frame)
+            frame.pack(anchor="w")
+            ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
+            ttk.Entry(frame, textvariable=var, width=8).pack(side=tk.LEFT)
+            ttk.Label(frame, text=unit).pack(side=tk.LEFT)
+
+        ttk.Label(control_frame, text="").pack()  # separator
+
+        ttk.Label(control_frame, text="Warunki początkowe").pack()
+        
+        for text, var, unit in [("\u03B8\u2081(0)", self.x10, "°"),
+                    ("\u03C9\u2081(0)", self.x20, "rad/s")]:
             frame = ttk.Frame(control_frame)
             frame.pack(anchor="w")
             ttk.Label(frame, text=f"{text}:").pack(side=tk.LEFT)
@@ -136,7 +151,7 @@ class SimulatorApp:
 
         # Wczytaj obraz układu
         self.image = Image.open("uklad.png")
-        self.image = self.image.resize((300, 250), Image.LANCZOS)
+        self.image = self.image.resize((300, 200), Image.LANCZOS)
         self.photo = ImageTk.PhotoImage(self.image)
 
         self.image_label = ttk.Label(image_frame, image=self.photo)
@@ -169,11 +184,11 @@ class SimulatorApp:
 
         # Wybór sygnału wejściowego
         if self.signal_type.get() == "square":
-            u_func = lambda t: u_square(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.duty.get())
+            u_func = lambda t: u_square(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.duty.get(), self.offset.get())
         elif self.signal_type.get() == "sawtooth":
-            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()))
+            u_func = lambda t: u_sawtooth(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.offset.get())
         else:
-            u_func = lambda t: u_harmonic(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()))
+            u_func = lambda t: u_harmonic(t, self.amplitude.get(), self.frequency.get(), np.radians(self.phase.get()), self.offset.get())
 
         #Inicjalizacja wyjścia
         u_vals = []
@@ -203,6 +218,7 @@ class SimulatorApp:
         self.axs[0].set_ylabel("T\u2098(t) [N·m]")
         self.axs[0].legend()
         self.axs[0].grid()
+
         # Wykres wyjścia theta
         self.axs[1].plot(t_vals, np.degrees(y_euler[:,0]), label="Euler - \u03B8\u2082 [°]")
         self.axs[1].plot(t_vals, np.degrees(y_rk4[:,0]), "--", label="RK4 - \u03B8\u2082 [°]")
@@ -210,6 +226,7 @@ class SimulatorApp:
         self.axs[1].set_ylabel("Kąt [°]")
         self.axs[1].legend()
         self.axs[1].grid()
+        
         # Wykres wyjścia omega
         self.axs[2].plot(t_vals, y_euler[:,1], label="Euler - \u03C9\u2082 [rad/s]")
         self.axs[2].plot(t_vals, y_rk4[:,1], "--", label="RK4 - \u03C9\u2082 [rad/s]")
