@@ -235,8 +235,8 @@ class SimulatorApp:
 
         # Wykres sygnału wejściowego
         self.axs[0].plot(t_vals, [u_func(t) for t in t_vals], label="u(t)")
-        self.axs[0].set_title("Sygnał wejściowy u(t) = T\u2098 [N·m]")
-        self.axs[0].set_ylabel("T\u2098(t) [N·m]")
+        self.axs[0].set_title("Sygnał wejściowy u(t) = \u03C4\u2098 [N·m]")
+        self.axs[0].set_ylabel("\u03C4\u2098(t) [N·m]")
         self.axs[0].legend()
         self.axs[0].grid()
 
