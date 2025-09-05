@@ -1,3 +1,10 @@
+"""
+Projekt z przedmiotu "Metody modelowania matematycznego"
+Zadanie numer 6
+Filip Dawid 193204
+Piotr Marwitz 193606
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
