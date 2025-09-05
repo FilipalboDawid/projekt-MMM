@@ -107,6 +107,7 @@ class SimulatorApp:
         ttk.Radiobutton(control_frame, text="Prostokątny", variable=self.signal_type, value="square").pack(anchor="w")
         ttk.Radiobutton(control_frame, text="Trójkątny", variable=self.signal_type, value="sawtooth").pack(anchor="w")
         ttk.Checkbutton(control_frame, text="Symetryczny (tylko trójkąt)", variable=self.sawtooth_symmetric).pack(anchor="w")
+        
         ttk.Label(control_frame, text="").pack()  # separator
 
         for text, var, unit in [("Amplituda", self.amplitude, "N·m"),
